@@ -1,0 +1,38 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - run: composer install
+      - run: php artisan test
+
+  deploy:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - run: composer install --no-dev --optimize-autoloader
+      - run: zip -r app.zip .
+      - name: Upload to S3
+        run: aws s3 cp app.zip s3://seo-builder-backend-artifacts/app-${{ github.sha }}.zip
+      - name: Deploy to Elastic Beanstalk
+        run: aws elasticbeanstalk create-application-version --application-name seo-builder-backend --version-label ${{ github.sha }} --source-bundle S3Bucket=seo-builder-backend-artifacts,S3Key=app-${{ github.sha }}.zip && aws elasticbeanstalk update-environment --environment-name seo-builder-backend-env --version-label ${{ github.sha }}
