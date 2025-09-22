@@ -13,6 +13,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Project::class => ProjectPolicy::class,
+        Page::class => PagePolicy::class,
     ];
 
     /**
@@ -21,5 +22,7 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
+        config(['permission.defaults.guard' => 'sanctum']);
     }
+    
 }

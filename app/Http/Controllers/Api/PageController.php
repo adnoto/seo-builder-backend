@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use App\Models\Project;  // ← ADD THIS IMPORT
 use App\Services\BuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -20,22 +21,28 @@ class PageController extends Controller
         $this->middleware('role:owner|admin|editor|viewer', ['only' => ['index', 'show']]);
     }
 
-    public function index(Request $request, $projectId): JsonResponse
+    public function index(Request $request, Project $project): JsonResponse
     {
-        $pages = Page::where('project_id', $projectId)
+        $this->authorize('view', $project);
+        $pages = $project->pages()
             ->select('id', 'page_type', 'slug', 'title', 'updated_at')
             ->get();
         return response()->json($pages);
     }
 
-    public function store(Request $request, $projectId): JsonResponse
+    public function store(Request $request, Project $project): JsonResponse  // ← FIX: Use Project model binding
     {
+        $this->authorize('update', $project);
         $validated = $request->validate([
             'page_type' => 'required|string',
             'slug' => 'required|string|regex:/^[a-z0-9-]+$/',
             'title' => 'required|string|max:255',
             'meta_description' => 'nullable|string|max:160',
             'page_structure' => 'nullable|array',
+            'seo_data' => 'nullable|array',
+            'ai_generated_content' => 'nullable|array',
+            'is_master_template' => 'boolean',
+            'parent_template_id' => 'nullable|exists:pages,id',
         ]);
 
         if (!$this->builderService->validatePageStructure($validated['page_structure'] ?? [])) {
@@ -44,7 +51,7 @@ class PageController extends Controller
 
         $page = Page::create([
             ...$validated,
-            'project_id' => $projectId,
+            'project_id' => $project->id,  // ← FIX: Use $project->id instead of $projectId
         ]);
 
         return response()->json($page, 201);
@@ -56,15 +63,19 @@ class PageController extends Controller
         return response()->json($page);
     }
 
-    public function update(Request $request, Page $page): JsonResponse
+    public function update(Request $request, Project $project, Page $page): JsonResponse
     {
-        $this->authorize('update', $page->project);
+        $this->authorize('update', $page);
         $validated = $request->validate([
             'page_type' => 'string',
             'slug' => 'string|regex:/^[a-z0-9-]+$/',
             'title' => 'string|max:255',
             'meta_description' => 'nullable|string|max:160',
             'page_structure' => 'nullable|array',
+            'seo_data' => 'nullable|array',
+            'ai_generated_content' => 'nullable|array',
+            'is_master_template' => 'boolean',
+            'parent_template_id' => 'nullable|exists:pages,id',
         ]);
 
         if ($request->header('If-Match') !== $page->updated_at->toString()) {
@@ -77,5 +88,12 @@ class PageController extends Controller
 
         $page->update($validated);
         return response()->json($page);
+    }
+    
+    public function destroy(Page $page): JsonResponse
+    {
+        $this->authorize('delete', $page->project);
+        $page->delete();
+        return response()->json(null, 204);
     }
 }

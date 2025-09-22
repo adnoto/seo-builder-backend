@@ -5,6 +5,15 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\PageController;
 use Illuminate\Support\Facades\Route;
 
+// Route model bindings - must be outside middleware groups
+Route::bind('project', function ($value) {
+    return \App\Models\Project::findOrFail($value);
+});
+
+Route::bind('page', function ($value) {
+    return \App\Models\Page::findOrFail($value);
+});
+
 // Public auth routes
 Route::post('register', [AuthController::class, 'register'])->name('register');
 Route::post('login', [AuthController::class, 'login'])->name('login');

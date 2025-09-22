@@ -22,4 +22,14 @@ class Project extends Model
     {
         return LogOptions::defaults()->logFillable();
     }
+
+    public function pages()
+    {
+        return $this->hasMany(Page::class);
+    }
+
+    public function exports()
+    {
+        return $this->hasMany(ProjectExport::class);
+    }
 }

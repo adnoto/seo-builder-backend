@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Project;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,14 +18,18 @@ class ProjectControllerTest extends TestCase
     {
         parent::setUp();
         $this->seed(RoleSeeder::class);
+        //$role = \Spatie\Permission\Models\Role::where('name', 'owner')->first();
     }
 
     public function test_owner_can_create_project(): void
     {
         $user = User::factory()->create();
         $user->assignRole('owner');
+        
+        /*$user = User::factory()->create();
+        $user->assignRole('owner', 'sanctum');*/
 
-        $response = $this->actingAs($user, 'sanctum')
+        $response = $this->actingAs($user, 'sanctum') 
             ->postJson('/api/projects', [
                 'name' => 'Test Project',
                 'target_keywords' => ['business valuation'],
@@ -39,6 +45,7 @@ class ProjectControllerTest extends TestCase
     public function test_viewer_cannot_create_project(): void
     {
         $user = User::factory()->create();
+        
         $user->assignRole('viewer');
 
         $response = $this->actingAs($user, 'sanctum')
@@ -52,16 +59,21 @@ class ProjectControllerTest extends TestCase
     public function test_can_list_projects(): void
     {
         $user = User::factory()->create();
+        
+        $user->assignRole('viewer');
+        
         Project::factory()->count(3)->create(['user_id' => $user->id]);
-
+        
         $response = $this->actingAs($user, 'sanctum')->getJson('/api/projects');
-
         $response->assertStatus(200)->assertJsonCount(3);
     }
 
     public function test_can_update_project(): void
     {
         $user = User::factory()->create();
+
+        $user->assignRole('owner');
+
         $project = Project::factory()->create(['user_id' => $user->id]);
 
         $response = $this->actingAs($user, 'sanctum')
@@ -80,6 +92,9 @@ class ProjectControllerTest extends TestCase
     public function test_version_mismatch_returns_409(): void
     {
         $user = User::factory()->create();
+
+        $user->assignRole('owner');
+        
         $project = Project::factory()->create(['user_id' => $user->id]);
 
         $response = $this->actingAs($user, 'sanctum')
