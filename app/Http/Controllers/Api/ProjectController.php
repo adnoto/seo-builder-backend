@@ -9,6 +9,13 @@ use Illuminate\Http\JsonResponse;
 
 class ProjectController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum');  
+        $this->middleware('role:owner|admin', ['only' => ['store', 'update', 'destroy']]);
+        $this->middleware('role:owner|admin|editor|viewer', ['only' => ['index', 'show']]);
+    }
+
     public function index(): JsonResponse
     {
         $projects = Project::where('user_id', auth()->id())

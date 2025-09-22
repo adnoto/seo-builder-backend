@@ -1,6 +1,4 @@
 <?php
-?/*Tradeoffs Flagged: BuilderService keyword-to-layout mapping is basic; expand later with AI-driven clustering (SEMrush/Ahrefs integration).
-JSON validation ensures semantic HTML but may reject valid structures; refine rules as needed. Scalability ensured via indexes and FKs.*/
 namespace App\Services;
 
 class BuilderService

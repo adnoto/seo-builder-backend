@@ -14,12 +14,6 @@ class AppServiceProvider extends ServiceProvider
         //
     }
 
-   'providers' => [
-    // ...
-    Spatie\Permission\PermissionServiceProvider::class,
-    Spatie\Activitylog\ActivitylogServiceProvider::class,
-   ],
-    
     /**
      * Bootstrap any application services.
      */

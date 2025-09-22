@@ -10,17 +10,15 @@ return new class extends Migration
     {
         Schema::create('pages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('project_id')->constrained()->cascadeOnDelete();
-            $table->string('page_type');
-            $table->string('slug')->index();
+            $table->foreignId('project_id')
+                  ->constrained()
+                  ->onDelete('cascade');
+
             $table->string('title');
-            $table->string('meta_description')->nullable();
-            $table->json('page_structure')->nullable();
-            $table->json('seo_data')->nullable();
-            $table->json('ai_generated_content')->nullable();
+            $table->string('slug')->unique();
+            $table->text('content')->nullable();
+
             $table->timestamps();
-            $table->unique(['project_id', 'page_type', 'slug'], 'idx_pages_unique');
-            $table->index(['project_id', 'page_type'], 'idx_pages_project_type');
         });
     }
 

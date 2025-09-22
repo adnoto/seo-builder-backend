@@ -10,12 +10,16 @@ return new class extends Migration
     {
         Schema::create('projects', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')
+                  ->constrained()
+                  ->onDelete('cascade');
+
             $table->string('name');
             $table->json('target_keywords')->nullable();
-            $table->json('settings')->nullable();
-            $table->timestamps();
-            $table->index(['user_id', 'created_at'], 'idx_projects_recent');
+
+            // Optional: track versioning for optimistic locking
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('created_at')->useCurrent();
         });
     }
 

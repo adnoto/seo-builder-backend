@@ -14,7 +14,10 @@ class PageController extends Controller
 
     public function __construct(BuilderService $builderService)
     {
+        $this->middleware('auth:sanctum');
         $this->builderService = $builderService;
+        $this->middleware('role:owner|admin', ['only' => ['store', 'update']]);
+        $this->middleware('role:owner|admin|editor|viewer', ['only' => ['index', 'show']]);
     }
 
     public function index(Request $request, $projectId): JsonResponse
