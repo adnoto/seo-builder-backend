@@ -24,6 +24,7 @@ class Kernel extends HttpKernel
     /**
      * The application's route middleware groups.
      */
+
     protected $middlewareGroups = [
         'web' => [
             \App\Http\Middleware\EncryptCookies::class,
@@ -40,7 +41,7 @@ class Kernel extends HttpKernel
                 \Illuminate\Routing\Middleware\SubstituteBindings::class,
                 \App\Http\Middleware\IdempotencyMiddleware::class,
         ],
-
+    ];
     /**
      * The application's route middleware aliases.
      *
@@ -57,5 +58,8 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+        'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
     ];
 }

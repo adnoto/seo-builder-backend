@@ -38,9 +38,11 @@ class RoleTest extends TestCase
         $viewerUser = User::factory()->create();
         $viewerUser->assignRole('viewer');
 
-        // Test with your existing page creation endpoint
+        // Create a real project first
+        $project = Project::factory()->create();
+
         $response = $this->actingAs($adminUser, 'sanctum')
-            ->postJson('/api/projects/1/pages', [
+            ->postJson("/api/projects/{$project->id}/pages", [
                 'page_type' => 'standard',
                 'slug' => 'test-page',
                 'title' => 'Test Page'
@@ -48,10 +50,10 @@ class RoleTest extends TestCase
         $response->assertStatus(201);
 
         $response = $this->actingAs($viewerUser, 'sanctum')
-            ->postJson('/api/projects/1/pages', [
+            ->postJson("/api/projects/{$project->id}/pages", [
                 'page_type' => 'standard',
-                'slug' => 'test-page',
-                'title' => 'Test Page'
+                'slug' => 'test-page-2',
+                'title' => 'Test Page 2'
             ]);
         $response->assertStatus(403);
     }
