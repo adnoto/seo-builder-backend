@@ -138,6 +138,9 @@ class ExportController extends Controller
                 'Content-Disposition' => 'attachment; filename="' . $export->generateDownloadFilename() . '"'
             ]
         );
+
+        $export->delete();
+        return $response;
     }
 
     /**

@@ -18,40 +18,32 @@ class ExportService
             throw new Exception("Project {$project->id} has no pages to export");
         }
         
-        // Generate unique theme name to prevent overwrites
         $themeName = "seobuilder-project-{$project->id}-" . date('Ymd-His');
         $themeDir = "exports/{$themeName}";
         
         Storage::makeDirectory($themeDir);
         
-        // Generate style.css (must be first for WordPress theme recognition)
         $style = $this->generateStyleCss($project, $themeName);
         Storage::put("{$themeDir}/style.css", $style);
         
-        // Generate header.php
         $header = $this->generateHeader($project);
         Storage::put("{$themeDir}/header.php", $header);
         
-        // Generate footer.php
         $footer = $this->generateFooter();
         Storage::put("{$themeDir}/footer.php", $footer);
         
-        // Generate index.php (WordPress fallback requirement)
         $index = $this->generateIndexTemplate();
         Storage::put("{$themeDir}/index.php", $index);
         
-        // Generate page templates
         foreach ($pages as $page) {
             $content = $this->generatePageTemplate($page);
             Storage::put("{$themeDir}/page-{$page->slug}.php", $content);
         }
         
-        // Create ZIP file - use storage disk for consistency
         $zipFilename = "seobuilder-project-{$project->id}-" . date('Ymd-His') . ".zip";
         $zipPath = "exports/{$zipFilename}";
         $fullZipPath = Storage::path($zipPath);
 
-        // Ensure directory exists
         $zipDir = dirname($fullZipPath);
         if (!is_dir($zipDir)) {
             mkdir($zipDir, 0755, true);
@@ -62,7 +54,6 @@ class ExportService
             throw new Exception("Cannot create ZIP file: {$fullZipPath}");
         }
         
-        // Add all theme files to ZIP
         $files = Storage::files($themeDir);
         foreach ($files as $file) {
             $zip->addFile(Storage::path($file), basename($file));
@@ -72,10 +63,12 @@ class ExportService
             throw new Exception("Failed to close ZIP file: {$fullZipPath}");
         }
         
-        // Clean up temporary directory
+        // Clean up temporary directory (but keep the ZIP file)
         Storage::deleteDirectory($themeDir);
         
-        return $fullZipPath;
+        // DO NOT delete the ZIP file - it needs to exist for download
+        
+        return $zipPath; // Return relative path
     }
     
     protected function generateStyleCss(Project $project, string $themeName): string

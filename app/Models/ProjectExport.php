@@ -102,16 +102,15 @@ class ProjectExport extends Model
     /**
      * Business Logic Methods
      */
-    public function markAsReady(string $filePath, string $filename): void
+   public function markAsReady(string $filePath, string $filename): void
     {
         $this->update([
             'status' => 'ready',
             'file_path' => $filePath,
             'original_filename' => $filename,
-            'file_size' => $this->file_exists ? Storage::size($filePath) : null,
+            'file_size' => Storage::exists($filePath) ? Storage::size($filePath) : null,
         ]);
     }
-
     public function markAsFailed(): void
     {
         $this->update(['status' => 'failed']);
@@ -147,6 +146,17 @@ class ProjectExport extends Model
         static::deleting(function ($export) {
             // Clean up file when export is deleted
             $export->cleanup();
+        });
+        
+        // Optional: Clean up files older than 24 hours
+        static::created(function ($export) {
+            // Delete exports older than 24 hours
+            static::where('created_at', '<', now()->subDay())
+                ->chunk(100, function ($oldExports) {
+                    foreach ($oldExports as $oldExport) {
+                        $oldExport->delete();
+                    }
+                });
         });
     }
 

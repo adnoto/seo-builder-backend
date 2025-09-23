@@ -25,7 +25,7 @@ class PageController extends Controller
     {
         $this->authorize('view', $project);
         $pages = $project->pages()
-            ->select('id', 'page_type', 'slug', 'title', 'updated_at')
+            ->select('id', 'page_type', 'slug', 'title', 'page_structure', 'meta_description', 'seo_data', 'updated_at')
             ->get();
         return response()->json($pages);
     }
@@ -44,6 +44,8 @@ class PageController extends Controller
             'is_master_template' => 'boolean',
             'parent_template_id' => 'nullable|exists:pages,id',
         ]);
+
+        Log::info('PageController@store', ['request' => $validated, 'project_id' => $project->id]);
 
         if (!$this->builderService->validatePageStructure($validated['page_structure'] ?? [])) {
             return response()->json(['error' => 'Invalid page structure'], 422);
