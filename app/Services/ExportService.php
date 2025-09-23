@@ -1,48 +1,62 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Page;
 use App\Models\Project;
 use Illuminate\Support\Facades\Storage;
-use Exception;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use ZipArchive;
 
 class ExportService
 {
+    /**
+     * Generate a WordPress theme ZIP for the project.
+     *
+     * @param Project $project
+     * @return string Path to the generated ZIP file
+     * @throws \RuntimeException
+     */
     public function generateWordPressTheme(Project $project): string
     {
-        $pages = Page::where('project_id', $project->id)->get();
-        
-        if ($pages->isEmpty()) {
-            throw new Exception("Project {$project->id} has no pages to export");
+        if (!config('filesystems.disks.private')) {
+            Log::error('Private disk not configured');
+            throw new \RuntimeException('Disk [private] does not have a configured driver.');
         }
-        
-        $themeName = "seobuilder-project-{$project->id}-" . date('Ymd-His');
+
+        $pages = Page::where('project_id', $project->id)->get();
+
+        $themeName = "seobuilder-project-{$project->id}-" . now()->format('Ymd-His');
         $themeDir = "exports/{$themeName}";
-        
-        Storage::makeDirectory($themeDir);
-        
+        Storage::disk('private')->makeDirectory($themeDir);
+
         $style = $this->generateStyleCss($project, $themeName);
-        Storage::put("{$themeDir}/style.css", $style);
-        
+        Storage::disk('private')->put("{$themeDir}/style.css", $style);
+
         $header = $this->generateHeader($project);
-        Storage::put("{$themeDir}/header.php", $header);
-        
+        Storage::disk('private')->put("{$themeDir}/header.php", $header);
+
         $footer = $this->generateFooter();
-        Storage::put("{$themeDir}/footer.php", $footer);
-        
+        Storage::disk('private')->put("{$themeDir}/footer.php", $footer);
+
         $index = $this->generateIndexTemplate();
-        Storage::put("{$themeDir}/index.php", $index);
-        
+        Storage::disk('private')->put("{$themeDir}/index.php", $index);
+
+        if ($pages->isEmpty()) {
+            Storage::disk('private')->put("{$themeDir}/page-empty.php", '<?php // No content defined for this page ?>');
+        }
+
         foreach ($pages as $page) {
             $content = $this->generatePageTemplate($page);
-            Storage::put("{$themeDir}/page-{$page->slug}.php", $content);
+            Storage::disk('private')->put("{$themeDir}/page-{$page->slug}.php", $content);
         }
-        
-        $zipFilename = "seobuilder-project-{$project->id}-" . date('Ymd-His') . ".zip";
+
+        $zipFilename = "seobuilder-project-{$project->id}-" . now()->format('Ymd-His') . ".zip";
         $zipPath = "exports/{$zipFilename}";
-        $fullZipPath = Storage::path($zipPath);
+        $fullZipPath = storage_path("app/private/{$zipPath}");
 
         $zipDir = dirname($fullZipPath);
         if (!is_dir($zipDir)) {
@@ -50,27 +64,38 @@ class ExportService
         }
 
         $zip = new ZipArchive();
-        if ($zip->open($fullZipPath, ZipArchive::CREATE) !== TRUE) {
-            throw new Exception("Cannot create ZIP file: {$fullZipPath}");
+        if ($zip->open($fullZipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            Log::error('Failed to create ZIP file', ['path' => $fullZipPath]);
+            throw new \RuntimeException("Cannot create ZIP file: {$fullZipPath}");
         }
-        
-        $files = Storage::files($themeDir);
+
+        $files = Storage::disk('private')->files($themeDir);
         foreach ($files as $file) {
-            $zip->addFile(Storage::path($file), basename($file));
+            $filePath = Storage::disk('private')->path($file);
+            $zip->addFile($filePath, basename($file));
         }
-        
+
         if (!$zip->close()) {
-            throw new Exception("Failed to close ZIP file: {$fullZipPath}");
+            Log::error('Failed to close ZIP file', ['path' => $fullZipPath]);
+            throw new \RuntimeException("Failed to close ZIP file: {$fullZipPath}");
         }
-        
-        // Clean up temporary directory (but keep the ZIP file)
-        Storage::deleteDirectory($themeDir);
-        
-        // DO NOT delete the ZIP file - it needs to exist for download
-        
-        return $zipPath; // Return relative path
+
+        Storage::disk('private')->deleteDirectory($themeDir);
+        return $fullZipPath;
     }
-    
+
+    /**
+     * Clean up old export files.
+     *
+     * @param string $zipPath
+     */
+    public function cleanup(string $zipPath): void
+    {
+        if (file_exists($zipPath)) {
+            unlink($zipPath);
+        }
+    }
+
     protected function generateStyleCss(Project $project, string $themeName): string
     {
         return <<<CSS
@@ -117,7 +142,7 @@ main {
 }
 CSS;
     }
-    
+
     protected function generateHeader(Project $project): string
     {
         return <<<PHP
@@ -138,7 +163,7 @@ CSS;
 <?php wp_body_open(); ?>
 PHP;
     }
-    
+
     protected function generateFooter(): string
     {
         return <<<PHP
@@ -147,7 +172,7 @@ PHP;
 </html>
 PHP;
     }
-    
+
     protected function generateIndexTemplate(): string
     {
         return <<<PHP
@@ -175,13 +200,13 @@ get_header();
 <?php get_footer(); ?>
 PHP;
     }
-    
+
     protected function generatePageTemplate(Page $page): string
     {
         $content = "<?php\n/**\n * Template Name: {$page->title}\n * Generated from SEO Builder\n */\nget_header();\n?>\n\n";
-        
+
         $components = $page->page_structure['components'] ?? [];
-        
+
         if (empty($components)) {
             $content .= "<main><h1>" . e($page->title) . "</h1><p>No content defined for this page.</p></main>\n";
         } else {
@@ -189,12 +214,12 @@ PHP;
                 $content .= $this->renderComponent($component);
             }
         }
-        
+
         $content .= "\n<?php get_footer(); ?>";
-        
+
         return $content;
     }
-    
+
     protected function renderComponent(array $component): string
     {
         switch ($component['type']) {
@@ -204,19 +229,17 @@ PHP;
                        "    <p>" . e($component['props']['sub'] ?? '') . "</p>\n" .
                        "    <a href='#'>" . e($component['props']['cta'] ?? 'Learn More') . "</a>\n" .
                        "</header>\n\n";
-                       
             case 'Main':
                 return "<main>\n" .
                        "    " . e($component['props']['content'] ?? '') . "\n" .
                        "</main>\n\n";
-                       
             case 'CTA':
                 return "<section class='cta-section'>\n" .
                        "    <a href='#'>" . e($component['props']['text'] ?? 'Click Here') . "</a>\n" .
                        "</section>\n\n";
-                       
             default:
                 return "<!-- Unknown component type: {$component['type']} -->\n";
         }
     }
 }
+?>

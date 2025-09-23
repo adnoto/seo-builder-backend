@@ -31,4 +31,6 @@ Route::post('/projects/{project}/exports', [ExportController::class, 'store']);
 Route::get('/exports/{export}', [ExportController::class, 'show']);
 Route::get('/exports/{export}/download', [ExportController::class, 'download'])->name('exports.download');
 Route::delete('/exports/{export}', [ExportController::class, 'destroy']);
+Route::apiResource('projects', ProjectController::class);
+Route::post('/projects/{project}/apply-archetype', [ProjectController::class, 'applyArchetype'])->name('projects.apply-archetype');
 });
