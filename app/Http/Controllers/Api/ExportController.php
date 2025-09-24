@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateWordPressExport;
 use App\Models\Project;
 use App\Models\ProjectExport;
 use App\Services\ExportService;
@@ -52,6 +53,9 @@ class ExportController extends Controller
     /**
      * Create a new export
      */
+    /**
+     * Create a new export
+     */
     public function store(Request $request, Project $project): JsonResponse
     {
         // Check if user can update the project
@@ -73,33 +77,20 @@ class ExportController extends Controller
                 'snapshot_sha' => (new ProjectExport())->setRelation('project', $project)->generateSnapshotSha(),
             ]);
 
-            // Generate the theme
-            $zipPath = $this->exportService->generateWordPressTheme($project);
-            
-            // Get relative path for storage
-            $relativePath = str_replace(storage_path('app/'), '', $zipPath);
-            $filename = "project-{$project->name}-theme.zip";
-
-            // Mark export as ready
-            $export->markAsReady($relativePath, $filename);
+            // Dispatch the job instead of processing immediately
+            GenerateWordPressExport::dispatch($export);
 
             return response()->json([
                 'id' => $export->id,
                 'export_type' => $export->export_type,
                 'status' => $export->status,
-                'file_size_formatted' => $export->file_size_formatted,
+                'message' => 'Export started - processing in background',
                 'created_at' => $export->created_at,
-                'download_url' => route('exports.download', $export),
-            ], 201);
+            ], 202); // 202 = Accepted (processing)
 
         } catch (\Exception $e) {
-            // Mark export as failed if it exists
-            if (isset($export)) {
-                $export->markAsFailed();
-            }
-            
             return response()->json([
-                'error' => 'Export generation failed',
+                'error' => 'Failed to start export',
                 'message' => $e->getMessage()
             ], 500);
         }

@@ -9,6 +9,8 @@ use App\Services\ExportService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Queue;
+use App\Jobs\GenerateWordPressExport;
 use Tests\TestCase;
 
 class ExportControllerTest extends TestCase
@@ -49,37 +51,37 @@ class ExportControllerTest extends TestCase
 
     public function testItCreatesWordpressThemeExport()
     {
-        $this->mock(ExportService::class)
-            ->shouldReceive('generateWordPressTheme')
-            ->once()
-            ->andReturn(storage_path('app/private/exports/test.zip'));
+        Queue::fake();
 
         $response = $this->actingAs($this->user)
             ->postJson("/api/projects/{$this->project->id}/exports", [
                 'export_type' => 'wordpress_theme',
             ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(202) // Changed from 201 to 202
             ->assertJsonStructure([
                 'id',
                 'export_type',
                 'status',
-                'download_url',
-            ]);
+                'message',
+            ])
+            ->assertJsonFragment(['status' => 'pending']); // No longer 'ready'
+
+        // Assert the job was dispatched
+        Queue::assertPushed(GenerateWordPressExport::class);
     }
 
     public function testItDefaultsToWordpressThemeExportType()
     {
-        $this->mock(ExportService::class)
-            ->shouldReceive('generateWordPressTheme')
-            ->once()
-            ->andReturn(storage_path('app/private/exports/test.zip'));
+        Queue::fake();
 
         $response = $this->actingAs($this->user)
             ->postJson("/api/projects/{$this->project->id}/exports");
 
-        $response->assertStatus(201)
+        $response->assertStatus(202) // Changed from 201
             ->assertJsonFragment(['export_type' => 'wordpress_theme']);
+
+        Queue::assertPushed(GenerateWordPressExport::class);
     }
 
     public function testItDeniesExportCreationToViewer()
@@ -92,44 +94,30 @@ class ExportControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function testItHandlesExportCreationFailure()
-    {
-        $this->mock(ExportService::class)
-            ->shouldReceive('generateWordPressTheme')
-            ->once()
-            ->andThrow(new \RuntimeException('Export generation failed'));
-
-        $response = $this->actingAs($this->user)
-            ->postJson("/api/projects/{$this->project->id}/exports");
-
-        $response->assertStatus(500)
-            ->assertJsonFragment(['error' => 'Export generation failed']);
-    }
-
     public function testItHandlesEmptyProjectExport()
     {
+        Queue::fake();
+        
         $emptyProject = Project::factory()->create(['user_id' => $this->user->id]);
-        $this->mock(ExportService::class)
-            ->shouldReceive('generateWordPressTheme')
-            ->once()
-            ->andReturn(storage_path('app/private/exports/test-empty.zip'));
 
         $response = $this->actingAs($this->user)
             ->postJson("/api/projects/{$emptyProject->id}/exports");
 
-        $response->assertStatus(201)
+        $response->assertStatus(202) // Changed from 201
             ->assertJsonStructure([
                 'id',
                 'export_type',
                 'status',
-                'download_url',
+                'message',
             ]);
 
         $this->assertDatabaseHas('project_exports', [
             'project_id' => $emptyProject->id,
             'export_type' => 'wordpress_theme',
-            'status' => 'ready',
+            'status' => 'pending', // Changed from 'ready'
         ]);
+
+        Queue::assertPushed(GenerateWordPressExport::class);
     }
 
     public function testItShowsExportDetails()
