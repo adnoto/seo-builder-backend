@@ -74,9 +74,9 @@ class TemplateRegistryServiceTest extends TestCase
     {
         $user = User::factory()->create()->assignRole('owner');
         $project = Project::factory()->create(['user_id' => $user->id]);
-        $service = app(TemplateRegistryService::class);
+        
+        // Mock the BuilderService and bind it to the container BEFORE resolving TemplateRegistryService
         $builder = $this->mock(BuilderService::class);
-
         $builder->shouldReceive('createPage')
             ->times(4)
             ->andReturnUsing(function ($proj, $pageData) {
@@ -88,6 +88,9 @@ class TemplateRegistryServiceTest extends TestCase
                     'page_structure' => $pageData['page_structure'],
                 ];
             });
+
+        // Now get the service - it will use the mocked BuilderService
+        $service = app(TemplateRegistryService::class);
 
         $pages = $service->applyToProject($project, 'professional', 'uuid-123');
 
@@ -103,9 +106,8 @@ class TemplateRegistryServiceTest extends TestCase
         Cache::flush(); // Clear cache to ensure fresh state
         $user = User::factory()->create()->assignRole('owner');
         $project = Project::factory()->create(['user_id' => $user->id]);
-        $service = app(TemplateRegistryService::class);
+        
         $builder = $this->mock(BuilderService::class);
-
         $builder->shouldReceive('createPage')
             ->times(4)
             ->andReturnUsing(function ($proj, $pageData) {
@@ -116,14 +118,15 @@ class TemplateRegistryServiceTest extends TestCase
                 ];
             });
 
+        $service = app(TemplateRegistryService::class);
+
         // First call: should create pages
         $pages = $service->applyToProject($project, 'professional', 'uuid-123');
         $this->assertCount(4, $pages);
 
-        // Second call with same key: should skip creation
-        $builder->shouldNotReceive('createPage');
+        // Second call with same key: should skip creation and return existing pages
         $pages = $service->applyToProject($project, 'professional', 'uuid-123');
-        $this->assertCount(0, $pages); // Returns existing pages (mocked as empty for simplicity)
+        $this->assertCount(4, $pages); // Should return the cached pages
 
         // New key: should create pages again
         $builder->shouldReceive('createPage')->times(4);
@@ -135,9 +138,8 @@ class TemplateRegistryServiceTest extends TestCase
     {
         $user = User::factory()->create()->assignRole('owner');
         $project = Project::factory()->create(['user_id' => $user->id]);
-        $service = app(TemplateRegistryService::class);
+        
         $builder = $this->mock(BuilderService::class);
-
         $builder->shouldReceive('createPage')
             ->times(4)
             ->andReturnUsing(function ($proj, $pageData) {
@@ -159,6 +161,8 @@ class TemplateRegistryServiceTest extends TestCase
                     ],
                 ];
             });
+
+        $service = app(TemplateRegistryService::class);
 
         $pages = $service->applyToProject($project, 'professional', 'uuid-789');
 

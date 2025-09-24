@@ -148,7 +148,7 @@ class ExportControllerTest extends TestCase
         $export = ProjectExport::factory()->create([
             'project_id' => $this->project->id,
             'status' => 'ready',
-            'file_path' => storage_path('app/private/exports/test.zip'),
+            'file_path' => 'exports/test.zip', // Use relative path, not absolute
         ]);
 
         Storage::disk('private')->put('exports/test.zip', 'dummy content');

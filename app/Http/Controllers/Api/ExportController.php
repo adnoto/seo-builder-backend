@@ -115,9 +115,8 @@ class ExportController extends Controller
         // Check if export is ready and file exists
         if (!$export->is_ready) {
             return response()->json([
-                'error' => 'Export is not ready for download',
-                'status' => $export->status
-            ], 422);
+                'error' => 'Export is not ready'
+            ], 400);
         }
 
         if (!$export->file_exists) {
@@ -129,8 +128,8 @@ class ExportController extends Controller
         // Record the download
         $export->recordDownload();
 
-        // Stream the file download
-        return Storage::download(
+        // Stream the file download using the private disk
+        return Storage::disk('private')->download(
             $export->file_path,
             $export->generateDownloadFilename(),
             [
@@ -138,9 +137,6 @@ class ExportController extends Controller
                 'Content-Disposition' => 'attachment; filename="' . $export->generateDownloadFilename() . '"'
             ]
         );
-
-        $export->delete();
-        return $response;
     }
 
     /**
@@ -154,7 +150,7 @@ class ExportController extends Controller
             // This will trigger the model's deleting event which cleans up the file
             $export->delete();
 
-            return response()->json(['message' => 'Export deleted successfully']);
+            return response()->json(null, 204);
 
         } catch (\Exception $e) {
             return response()->json([

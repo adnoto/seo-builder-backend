@@ -42,9 +42,12 @@ class TemplateRegistryService
     public function applyToProject(Project $project, string $archetype, string $idempotencyKey): array
     {
         $cacheKey = "idempotency:{$project->id}:{$idempotencyKey}";
+        
+        // Check if we've already processed this request
         if (Cache::has($cacheKey)) {
             Log::info('Idempotent request skipped', ['key' => $idempotencyKey]);
-            return $project->pages->toArray();
+            // Return the cached result instead of querying the database
+            return Cache::get($cacheKey);
         }
 
         $structure = $this->getArchetype($archetype);
@@ -55,7 +58,9 @@ class TemplateRegistryService
             $pages[] = $this->builderService->createPage($project, $pageData);
         }
 
-        Cache::put($cacheKey, true, 86400);
+        // Cache the result for idempotency
+        Cache::put($cacheKey, $pages, 86400);
+        
         return $pages;
     }
 
@@ -93,4 +98,3 @@ class TemplateRegistryService
         }
     }
 }
-?>

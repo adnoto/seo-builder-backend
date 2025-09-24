@@ -80,7 +80,7 @@ class ProjectExport extends Model
 
     public function getFileExistsAttribute(): bool
     {
-        return $this->file_path && Storage::exists($this->file_path);
+        return $this->file_path && Storage::disk('private')->exists($this->file_path);
     }
 
     public function getFileSizeFormattedAttribute(): string
